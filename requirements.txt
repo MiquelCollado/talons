@@ -2,4 +2,4 @@ pbr>=0.5.23
 
 passlib
 six
-falcon
+falcon<=0.3
