@@ -229,37 +229,33 @@ def create_middleware(identify_with, authenticate_with,
     """
     if not isinstance(identify_with, list):
         identify_with = [identify_with]
-    for x, i in enumerate(identify_with):
-        if inspect.isclass(i):
-            if issubclass(i, interfaces.Identifies):
-                identify_with[x] = i = i(**conf)
+
+    if not isinstance(authenticate_with, list):
+        authenticate_with = [authenticate_with]
+
+    for idx, i in enumerate(identify_with):
         if not isinstance(i, interfaces.Identifies):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Identifies`")
             msg = msg.format(i.__class__.__name__)
             raise exc.BadConfiguration(msg)
+        elif issubclass(i, interfaces.Identifies):
+            identify_with[idx] = i = i(**conf)
 
-    if not isinstance(authenticate_with, list):
-        authenticate_with = [authenticate_with]
-    for x, a in enumerate(authenticate_with):
-        if inspect.isclass(a):
-            if issubclass(a, interfaces.Authenticates):
-                authenticate_with[x] = a = a(**conf)
-        if not isinstance(a, interfaces.Authenticates):
+    for idx, auth_class in enumerate(authenticate_with):
+        if not isinstance(auth_class, interfaces.Authenticates):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Authenticates`")
-            msg = msg.format(a.__class__.__name__)
+            msg = msg.format(auth_class.__class__.__name__)
             raise exc.BadConfiguration(msg)
+        elif issubclass(auth_class, interfaces.Authenticates):
+            authenticate_with[idx] = auth_class = auth_class(**conf)
 
     if authorize_with is not None:
-        if inspect.isclass(authorize_with):
-            if issubclass(authorize_with, interfaces.Authorizes):
-                authorize_with = authorize_with(**conf)
         if not isinstance(authorize_with, interfaces.Authorizes):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Authorizes`")
             msg = msg.format(authorize_with.__class__.__name__)
             raise exc.BadConfiguration(msg)
-
-    return Middleware(identify_with, authenticate_with,
-                      authorize_with, **conf)
+        elif issubclass(authorize_with, interfaces.Authorizes):
+            authorize_with = authorize_with(**conf)
