@@ -16,14 +16,13 @@
 
 import inspect
 
+import falcon
+
 from talons import exc
 from talons.auth import interfaces
 
-import falcon
-
 
 class Middleware(object):
-
     def __init__(self, identifiers, authenticators, authorizer=None, **conf):
         """
         Construct a concrete object with a set of keyword configuration
@@ -123,6 +122,77 @@ class Middleware(object):
         request.env['wsgi.authorized'] = authorized
         if not authorized and not self.delay_403:
             self.raise_403()
+
+    def _process_auth(self, request, params):
+        self._do_identify(request)
+        self._do_authenticate(request, request.env[interfaces.Identifies.IDENTITY_ENV_KEY])
+        self._do_authorize(request, params, request.env[interfaces.Identifies.IDENTITY_ENV_KEY])
+
+    def _do_identify(self, request):
+        identified = False
+        for i in self.identifiers:
+            if i.identify(request):
+                identified = True
+                break
+
+        request.env['wsgi.identified'] = identified
+        if not identified:
+            if self.delay_401:
+                return
+            self.raise_401_no_identity()
+
+        return True
+
+    def _do_authenticate(self, request, identity):
+        authenticated = False
+        for authenticator in self.authenticators:
+            if authenticator.authenticate(identity):
+                authenticated = True
+                break
+
+        request.env['wsgi.authenticated'] = authenticated
+        if not authenticated and not self.delay_401:
+            self.raise_401_fail_authenticate()
+
+        return authenticated
+
+    def _do_authorize(self, request, params, identity):
+        authorized = False
+
+        if self.authorizer is not None:
+            res = interfaces.ResourceAction(request, params)
+            authorized = self.authorizer.authorize(identity, res)
+
+        request.env['wsgi.authorized'] = authorized
+
+        if not authorized and not self.delay_403:
+            self.raise_403()
+
+        return authorized
+
+    def process_request(self, req, resp):
+        """
+        Process the request before routing it
+        :param req: Request object that will eventually be routed to a responder
+        :type req: falcon.Request
+        :param resp: Not Used
+        :return: None
+        """
+
+        self._process_auth(req, req.params)
+
+    def process_resource(self, req, resp, resource):
+        """
+        Process the request after routing.
+        ** NOTE: This might be used to run the authorization step **
+        """
+        pass
+
+    def process_response(self, req, resp, resource):
+        """
+        Process the response, after routing
+        """
+        pass
 
 
 def create_middleware(identify_with, authenticate_with,
