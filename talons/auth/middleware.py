@@ -14,7 +14,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-
+import inspect
 import falcon
 
 from talons import exc
@@ -124,8 +124,10 @@ class Middleware(object):
 
     def _process_auth(self, request, params):
         self._do_identify(request)
-        self._do_authenticate(request, request.env[interfaces.Identifies.IDENTITY_ENV_KEY])
-        self._do_authorize(request, params, request.env[interfaces.Identifies.IDENTITY_ENV_KEY])
+        self._do_authenticate(request, request.env[
+            interfaces.Identifies.IDENTITY_ENV_KEY])
+        self._do_authorize(request, params,
+                           request.env[interfaces.Identifies.IDENTITY_ENV_KEY])
 
     def _do_identify(self, request):
         identified = False
@@ -172,7 +174,7 @@ class Middleware(object):
     def process_request(self, req, resp):
         """
         Process the request before routing it
-        :param req: Request object that will eventually be routed to a responder
+        :param req: Request object. Will eventually be routed to a responder
         :type req: falcon.Request
         :param resp: Not Used
         :return: None
@@ -228,33 +230,37 @@ def create_middleware(identify_with, authenticate_with,
     """
     if not isinstance(identify_with, list):
         identify_with = [identify_with]
-
-    if not isinstance(authenticate_with, list):
-        authenticate_with = [authenticate_with]
-
-    for idx, i in enumerate(identify_with):
+    for x, i in enumerate(identify_with):
+        if inspect.isclass(i):
+            if issubclass(i, interfaces.Identifies):
+                identify_with[x] = i = i(**conf)
         if not isinstance(i, interfaces.Identifies):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Identifies`")
             msg = msg.format(i.__class__.__name__)
             raise exc.BadConfiguration(msg)
-        elif issubclass(i, interfaces.Identifies):
-            identify_with[idx] = i = i(**conf)
 
-    for idx, auth_class in enumerate(authenticate_with):
-        if not isinstance(auth_class, interfaces.Authenticates):
+    if not isinstance(authenticate_with, list):
+        authenticate_with = [authenticate_with]
+    for x, a in enumerate(authenticate_with):
+        if inspect.isclass(a):
+            if issubclass(a, interfaces.Authenticates):
+                authenticate_with[x] = a = a(**conf)
+        if not isinstance(a, interfaces.Authenticates):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Authenticates`")
-            msg = msg.format(auth_class.__class__.__name__)
+            msg = msg.format(a.__class__.__name__)
             raise exc.BadConfiguration(msg)
-        elif issubclass(auth_class, interfaces.Authenticates):
-            authenticate_with[idx] = auth_class = auth_class(**conf)
 
     if authorize_with is not None:
+        if inspect.isclass(authorize_with):
+            if issubclass(authorize_with, interfaces.Authorizes):
+                authorize_with = authorize_with(**conf)
         if not isinstance(authorize_with, interfaces.Authorizes):
             msg = ("{0} is not a subclass of "
                    "`talons.auth.interfaces.Authorizes`")
             msg = msg.format(authorize_with.__class__.__name__)
             raise exc.BadConfiguration(msg)
-        elif issubclass(authorize_with, interfaces.Authorizes):
-            authorize_with = authorize_with(**conf)
+
+    return Middleware(identify_with, authenticate_with,
+                      authorize_with, **conf)
