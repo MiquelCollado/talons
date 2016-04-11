@@ -40,25 +40,28 @@ class TestResource(base.TestCase):
                         self.resp_mock)
 
     def test_dotted_notation(self):
+        class test_middleware(object):
+            called = False
+            res = None
+            
+            def process_response(self, req, resp, resource):
+                test_middleware.res = interfaces.ResourceAction(req, resource)
+                test_middleware.called = True
 
-        def hook(req, resp, params):
-            self.res = interfaces.ResourceAction(req, params)
-            hook.called = True
+        test_middleware.called = False
 
-        hook.called = False
-
-        app = api.API(before=[hook])
+        app = api.API(middleware=[test_middleware()])
         app.add_route("/users/{user_id}", AppResource())
         self.app = app
 
         self.make_request('/users/123', method='GET')
-        self.assertTrue(hook.called)
-        res_dotted = self.res.to_string()
+        self.assertTrue(test_middleware.called)
+        res_dotted = test_middleware.res.to_string()
         self.assertEquals('users.123.get', res_dotted)
 
-        hook.called = False
+        test_middleware.called = False
 
         self.make_request('/users/123?q=23491', method='GET')
-        self.assertTrue(hook.called)
-        res_dotted = self.res.to_string()
+        self.assertTrue(test_middleware.called)
+        res_dotted = test_middleware.res.to_string()
         self.assertEquals('users.123.get', res_dotted)

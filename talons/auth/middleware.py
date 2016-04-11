@@ -78,11 +78,13 @@ class Middleware(object):
 
     def raise_401_no_identity(self):
         raise falcon.HTTPUnauthorized('Authentication required',
-                                      'No identity information found.')
+                                      'No identity information found.',
+                                      '')
 
     def raise_401_fail_authenticate(self):
         raise falcon.HTTPUnauthorized('Authentication required',
-                                      'Authentication failed.')
+                                      'Authentication failed.',
+                                      '')
 
     def raise_403(self):
         raise falcon.HTTPForbidden('Action not allowed',
